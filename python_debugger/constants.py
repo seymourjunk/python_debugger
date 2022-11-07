@@ -15,6 +15,7 @@ LPVOID      = ctypes.c_void_p
 DEBUG_PROCESS       = 0x00000001
 CREATE_NEW_CONSOLE  = 0x00000010
 DBG_CONTINUE        = 0x00010002
+PROCESS_ALL_ACCESS  = 0x001F0FFF
 INFINITE            = 0xFFFFFFFF
 
 # Structures for CreateProcessA()
