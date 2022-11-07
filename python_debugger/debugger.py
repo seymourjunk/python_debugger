@@ -53,7 +53,7 @@ class Debugger():
 
     def open_process(self, pid):
         # https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-openprocess
-        return kernel32.OpenProcess(ctypes.PROCESS_ALL_ACCESS, pid, False)
+        return kernel32.OpenProcess(constants.PROCESS_ALL_ACCESS, pid, False)
     
     def attach(self, pid):
         # https://learn.microsoft.com/en-us/windows/win32/api/debugapi/nf-debugapi-debugactiveprocess
