@@ -8,6 +8,9 @@ class Debugger():
         self.handle_process     = None
         self.pid                = None
         self.debugger_active    = False
+        self.handle_thread      = None
+        self.context            = None
+
 
     def load(self, exe_path):
         """
@@ -53,33 +56,86 @@ class Debugger():
 
     def open_process(self, pid):
         # https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-openprocess
-        return kernel32.OpenProcess(constants.PROCESS_ALL_ACCESS, pid, False)
+        return kernel32.OpenProcess(constants.PROCESS_ALL_ACCESS, False, pid)
     
+    def open_thread(self, thread_id):
+        # https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-openthread
+        h_thread = kernel32.OpenThread(constants.THREAD_ALL_ACCESS, None, thread_id)
+
+        if h_thread:
+            return h_thread
+        else:
+            print("[*] Could not obtain a valid thread handle.")
+            return False
+
+    def enumerate_threads(self):
+        # https://learn.microsoft.com/en-us/windows/win32/api/tlhelp32/nf-tlhelp32-createtoolhelp32snapshot
+        thread_entry = constants.THREADENTRY32()
+        threads = []
+        snapshot = kernel32.CreateToolhelp32Snapshot(constants.TH32CS_SNAPTHREAD, self.pid)
+
+        if snapshot:
+            #You have to set the size of the struct or the call will fail
+            thread_entry.dwSize = ctypes.sizeof(thread_entry)
+            success = kernel32.Thread32First(snapshot, ctypes.byref(thread_entry))
+
+            while success:
+                if thread_entry.th32OwnerProcessID == self.pid:
+                    threads.append(thread_entry.th32ThreadID)
+
+                success = kernel32.Thread32Next(snapshot, ctypes.byref(thread_entry))
+
+            kernel32.CloseHandle(snapshot)
+            return threads
+        else:
+            return []
+
+    def get_thread_context(self, thread_id=None, h_thread=None):
+        context = constants.CONTEXT()
+        context.ContextFlags = constants.CONTEXT_FULL | constants.CONTEXT_DEBUG_REGISTERS
+
+        # Obtain a handle to the thread
+        #h_thread = self.open_thread(thread_id)
+        # Obtain a handle to the thread
+        if not h_thread:
+            self.handle_thread = self.open_thread(thread_id)
+        if kernel32.GetThreadContext(self.handle_thread, ctypes.byref(context)):
+            #kernel32.CloseHandle(h_thread)
+            return context
+        else:
+            return None
+
     def attach(self, pid):
+        self.handle_process = self.open_process(pid)
+
         # https://learn.microsoft.com/en-us/windows/win32/api/debugapi/nf-debugapi-debugactiveprocess
         if kernel32.DebugActiveProcess(pid):
             self.debugger_active = True
             self.pid = pid
-            self.run()
+            #self.run()
         else:
             print(f"[*] Unable to attach to the process with PID: {pid}")
-
 
     def run(self):
         while self.debugger_active:
             self.get_debug_event()
-
 
     def get_debug_event(self):
         debug_event = constants.DEBUG_EVENT()
         continue_status = constants.DBG_CONTINUE
 
         if kernel32.WaitForDebugEvent(ctypes.byref(debug_event), constants.INFINITE):
-            input("Press a key to continue...")
-            self.debugger_active = False
-            # https://learn.microsoft.com/en-us/windows/win32/api/debugapi/nf-debugapi-continuedebugevent
-            kernel32.ContinueDebugEvent(debug_event.dwProcessId, debug_event.dwThreadId, continue_status)
+            self.handle_thread = self.open_thread(debug_event.dwThreadId)
+            self.context = self.get_thread_context(self.handle_thread)
+            self.debug_event = debug_event
 
+            print(f"Event Code: {debug_event.dwDebugEventCode}, Thread ID: {debug_event.dwThreadId}")
+
+            # input("Press a key to continue...")
+            # self.debugger_active = False
+            # https://learn.microsoft.com/en-us/windows/win32/api/debugapi/nf-debugapi-continuedebugevent
+        
+            kernel32.ContinueDebugEvent(debug_event.dwProcessId, debug_event.dwThreadId, continue_status)
 
     def detach(self):
         if kernel32.DebugActiveProcessStop(self.pid):

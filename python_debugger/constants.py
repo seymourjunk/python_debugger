@@ -3,12 +3,14 @@ import ctypes
 # Mapping of the Microsoft types to ctypes
 WORD        = ctypes.c_ushort
 DWORD       = ctypes.c_ulong
+BYTE        = ctypes.c_ubyte
 LPBYTE      = ctypes.POINTER(ctypes.c_ubyte)
 LPTSTR      = ctypes.POINTER(ctypes.c_char) 
 HANDLE      = ctypes.c_void_p
 PVOID       = ctypes.c_void_p
 ULONG_PTR   = ctypes.POINTER(ctypes.c_ulong) # ctypes.c_ulong
 LPVOID      = ctypes.c_void_p
+LONG        = ctypes.c_long
 
 
 # Define constants
@@ -17,6 +19,14 @@ CREATE_NEW_CONSOLE  = 0x00000010
 DBG_CONTINUE        = 0x00010002
 PROCESS_ALL_ACCESS  = 0x001F0FFF
 INFINITE            = 0xFFFFFFFF
+
+# Thread constants for CreateToolhelp32Snapshot()
+TH32CS_SNAPTHREAD   = 0x00000004
+THREAD_ALL_ACCESS   = 0x001F03FF
+
+# Context flags for GetThreadContext()
+CONTEXT_FULL            = 0x0010007
+CONTEXT_DEBUG_REGISTERS = 0x0010010
 
 # Structures for CreateProcessA()
 # https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/ns-processthreadsapi-startupinfoa
@@ -153,7 +163,6 @@ class DEBUG_EVENT_INFO(ctypes.Union):
         ("RipInfo",             RIP_INFO),
     ]
 
-
 # https://learn.microsoft.com/en-us/windows/win32/api/minwinbase/ns-minwinbase-debug_event
 class DEBUG_EVENT(ctypes.Structure):
     _fields_ = [
@@ -163,4 +172,58 @@ class DEBUG_EVENT(ctypes.Structure):
         ('u',                   DEBUG_EVENT_INFO)
     ]
 
+# https://learn.microsoft.com/en-us/windows/win32/api/tlhelp32/ns-tlhelp32-threadentry32
+class THREADENTRY32(ctypes.Structure):
+    _fields_ = [
+        ("dwSize",               DWORD),
+        ("cntUsage",             DWORD),
+        ("th32ThreadID",         DWORD),
+        ("th32OwnerProcessID",   DWORD),
+        ("tpBasePri",            LONG),
+        ("tpDeltaPri",           LONG),
+        ("dwFlags",              DWORD),
+    ]
 
+# https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-wow64_floating_save_area
+class FLOATING_SAVE_AREA(ctypes.Structure):
+    _fields_ = [
+        ("ControlWord",     DWORD),
+        ("StatusWord",      DWORD),
+        ("TagWord",         DWORD),
+        ("ErrorOffset",     DWORD),
+        ("ErrorSelector",   DWORD),
+        ("DataOffset",      DWORD),
+        ("DataSelector",    DWORD),
+        ("RegisterArea",    DWORD),
+        ("Cr0NpxState",     BYTE * 80),
+    ]
+
+# https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-wow64_context
+class CONTEXT(ctypes.Structure):
+    _fields_ = [
+        ("ContextFlags",        DWORD),
+        ("Dr0",                 DWORD),
+        ("Dr1",                 DWORD),
+        ("Dr2",                 DWORD),
+        ("Dr3",                 DWORD),
+        ("Dr6",                 DWORD),
+        ("Dr7",                 DWORD),
+        ("FloatSave",           FLOATING_SAVE_AREA),
+        ("SegGs",               WORD),
+        ("SegFs",               WORD),
+        ("SegEs",               WORD),
+        ("SegDs",               WORD),
+        ("Edi",                 WORD),
+        ("Esi",                 DWORD),
+        ("Ebx",                 DWORD),
+        ("Edx",                 DWORD),
+        ("Ecx",                 DWORD),
+        ("Eax",                 DWORD),
+        ("Ebp",                 DWORD),
+        ("Eip",                 DWORD),
+        ("SegCs",               DWORD),
+        ("EFlags",              DWORD),
+        ("Esp",                 DWORD),
+        ("SegSs",               DWORD),
+        ("ExtendedRegisters",   BYTE * 512),
+    ]
