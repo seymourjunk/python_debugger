@@ -10,6 +10,8 @@ class Debugger():
         self.debugger_active    = False
         self.handle_thread      = None
         self.context            = None
+        self.exception          = None
+        self.exception_address  = 0x0
 
 
     def load(self, exe_path):
@@ -127,15 +129,37 @@ class Debugger():
         if kernel32.WaitForDebugEvent(ctypes.byref(debug_event), constants.INFINITE):
             self.handle_thread = self.open_thread(debug_event.dwThreadId)
             self.context = self.get_thread_context(self.handle_thread)
-            self.debug_event = debug_event
 
             print(f"Event Code: {debug_event.dwDebugEventCode}, Thread ID: {debug_event.dwThreadId}")
 
             # input("Press a key to continue...")
             # self.debugger_active = False
-            # https://learn.microsoft.com/en-us/windows/win32/api/debugapi/nf-debugapi-continuedebugevent
-        
+
+            # check if the event code ia an exception
+            if debug_event.dwDebugEventCode == constants.EXCEPTION_DEBUG_EVENT:
+                self.exception = debug_event.u.Exception.ExceptionRecord.ExceptionCode
+                self.exception_address = debug_event.u.Exception.ExceptionRecord.ExceptionAddress
+
+                if self.exception == constants.EXCEPTION_ACCESS_VIOLATION:
+                    print("[E]: Access Violation Detected")
+                elif self.exception == constants.EXCEPTION_BREAKPOINT:
+                    continue_status = self.exception_handler_breakpoint()
+                elif self.exception == constants.EXCEPTION_GUARD_PAGE:
+                    print("[E]: Guard Page Access Detected")
+                elif self.exception == constants.EXCEPTION_SINGLE_STEP:
+                    self.exception_handler_single_step()
+
+            # https://learn.microsoft.com/en-us/windows/win32/api/debugapi/nf-debugapi-continuedebugevent      
             kernel32.ContinueDebugEvent(debug_event.dwProcessId, debug_event.dwThreadId, continue_status)
+
+
+    def exception_handler_breakpoint(self):
+        print("[*] Inside the breakpoint handler")
+        print(f"Exception Address: {hex(self.exception_address)}")
+        return constants.DBG_CONTINUE
+
+    def exception_handler_single_step(self):
+        pass
 
     def detach(self):
         if kernel32.DebugActiveProcessStop(self.pid):
