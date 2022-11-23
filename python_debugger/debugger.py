@@ -12,6 +12,7 @@ class Debugger():
         self.context            = None
         self.exception          = None
         self.exception_address  = 0x0
+        self.breakpoints        = {}
 
 
     def load(self, exe_path):
@@ -69,6 +70,43 @@ class Debugger():
         else:
             print("[*] Could not obtain a valid thread handle.")
             return False
+
+    def read_process_memory(self, address, length):
+        data = ""
+        read_buf = ctypes.create_string_buffer(length)
+        count = ctypes.c_ulong(0)
+
+        if kernel32.ReadProcessMemory(self.handle_process, address, read_buf, length, ctypes.byref(count)):
+            data += read_buf.raw
+            return data
+        return False
+
+    def write_process_memory(self, address, data):
+        count = ctypes.c_ulong(0)
+        length = len(data)
+
+        c_data = ctypes.c_char_p(data[count.value:])
+
+        if kernel32.WriteProcessMemory(self.handle_process, address, c_data, length, ctypes.byref(count)):
+            return True
+        
+        return False
+
+    def set_breakpoint(self, address):
+        if not self.breakpoints.has_key(address):
+            try:
+                # store the original byte
+                original_byte = self.read_process_memory(address, 1)
+
+                # write the INT3 opcode
+                self.write_process_memory(address, "\xCC")
+
+                #register the breakpoint in our internal list
+                self.breakpoints[address] = (address, original_byte)
+            except:
+                return False
+            
+        return True
 
     def enumerate_threads(self):
         # https://learn.microsoft.com/en-us/windows/win32/api/tlhelp32/nf-tlhelp32-createtoolhelp32snapshot
@@ -151,7 +189,6 @@ class Debugger():
 
             # https://learn.microsoft.com/en-us/windows/win32/api/debugapi/nf-debugapi-continuedebugevent      
             kernel32.ContinueDebugEvent(debug_event.dwProcessId, debug_event.dwThreadId, continue_status)
-
 
     def exception_handler_breakpoint(self):
         print("[*] Inside the breakpoint handler")
