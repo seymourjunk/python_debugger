@@ -77,7 +77,7 @@ class Debugger():
         count = ctypes.c_ulong(0)
 
         if kernel32.ReadProcessMemory(self.handle_process, address, read_buf, length, ctypes.byref(count)):
-            data += read_buf.raw
+            data = read_buf.raw
             return data
         return False
 
@@ -93,7 +93,7 @@ class Debugger():
         return False
 
     def set_breakpoint(self, address):
-        if not self.breakpoints.has_key(address):
+        if address in self.breakpoints:
             try:
                 # store the original byte
                 original_byte = self.read_process_memory(address, 1)
@@ -107,6 +107,14 @@ class Debugger():
                 return False
             
         return True
+
+    def get_function_address(self, dll, function):
+        handle = kernel32.GetModuleHandleA(dll)
+        address = kernel32.GetProcAddress(handle, function)
+
+        kernel32.CloseHandle(handle)
+
+        return address
 
     def enumerate_threads(self):
         # https://learn.microsoft.com/en-us/windows/win32/api/tlhelp32/nf-tlhelp32-createtoolhelp32snapshot

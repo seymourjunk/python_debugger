@@ -31,5 +31,9 @@ debugger.attach(int(pid))
     # else:
         # print("[*] Unable to get a thread context")
 
+printf_address = debugger.get_function_address(b"msvcrt.dll", b"printf")
+
+print(f"[*] Address of printf function from msvcrt.dll: {hex(printf_address)}")
+debugger.set_breakpoint(printf_address)
 debugger.run()
 debugger.detach()
